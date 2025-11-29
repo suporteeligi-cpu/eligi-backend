@@ -28,27 +28,35 @@ export class AuthService {
   }
 
   async login(data: { email: string; password: string }) {
-    const user = await userRepository.findByEmail(data.email);
-    if (!user) {
-      const error = new Error('Invalid credentials');
-      (error as any).status = 401;
-      throw error;
-    }
-
-    const match = await comparePassword(data.password, user.passwordHash);
-    if (!match) {
-      const error = new Error('Invalid credentials');
-      (error as any).status = 401;
-      throw error;
-    }
-
-    const accessToken = signAccessToken({ sub: user.id, email: user.email });
-    const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
-
-    await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
-
-    return { user, accessToken, refreshToken };
+  const user = await userRepository.findByEmail(data.email);
+  if (!user) {
+    const error = new Error('Invalid credentials');
+    (error as any).status = 401;
+    throw error;
   }
+
+  // ⛔ Usuário sem senha não pode logar via password
+  if (!user.passwordHash) {
+    const error = new Error('This account does not allow password login');
+    (error as any).status = 401;
+    throw error;
+  }
+
+  const match = await comparePassword(data.password, user.passwordHash);
+  if (!match) {
+    const error = new Error('Invalid credentials');
+    (error as any).status = 401;
+    throw error;
+  }
+
+  const accessToken = signAccessToken({ sub: user.id, email: user.email });
+  const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+  await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
+
+  return { user, accessToken, refreshToken };
+}
+
 
   async refreshToken(token: string) {
     const existing = await refreshTokenRepository.findValid(token);
