@@ -2,9 +2,6 @@ import { userRepository } from '../repositories/userRepository';
 import { refreshTokenRepository } from '../repositories/refreshTokenRepository';
 import { comparePassword, hashPassword } from '../utils/hash';
 import { signAccessToken, signRefreshToken } from '../utils/jwt';
-import { OAuth2Client } from 'google-auth-library';
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export class AuthService {
   async register(data: { email: string; password: string; name: string }) {
@@ -83,57 +80,6 @@ export class AuthService {
 
   async logoutAll(userId: string) {
     await refreshTokenRepository.revokeAllForUser(userId);
-  }
-
-  // ✅🔥 NOVO — Login/Register via Google (SEM ALTERAR NADA DO RESTO)
-  async googleAuth(credential: string) {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
-
-    const payload = ticket.getPayload();
-    if (!payload) {
-      const err = new Error("Invalid Google token");
-      (err as any).status = 400;
-      throw err;
-    }
-
-    const email = payload.email!;
-    const name = payload.name!;
-    const avatar = payload.picture;
-    const googleId = payload.sub;
-
-    let user = await userRepository.findByEmail(email);
-
-    // Já existe → login normal
-    if (user) {
-      const accessToken = signAccessToken({ sub: user.id, email: user.email });
-      const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
-
-      await refreshTokenRepository.create({
-        userId: user.id,
-        token: refreshToken
-      });
-
-      return { user, accessToken, refreshToken };
-    }
-
-    // Criar novo usuário Google
-    user = await userRepository.create({
-      email,
-      name,
-      googleId,
-      avatar,
-      passwordHash: null
-    });
-
-    const accessToken = signAccessToken({ sub: user.id, email: user.email });
-    const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
-
-    await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
-
-    return { user, accessToken, refreshToken };
   }
 }
 
