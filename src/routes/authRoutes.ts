@@ -22,9 +22,4 @@ router.post('/logout', validateRequest(refreshSchema), (req, res, next) =>
   authController.logout(req, res, next)
 );
 
-// ✅🔥 NOVO — Google Auth
-router.post('/google', (req, res, next) =>
-  authController.googleAuth(req, res, next)
-);
-
 export default router;
