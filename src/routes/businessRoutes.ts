@@ -20,7 +20,7 @@ const router = Router();
  * Retorna o negócio do usuário logado
  */
 router.get("/me", authMiddleware, (req, res, next) =>
-  businessController.getBusiness(req, res, next)
+  businessController.getBusiness(req, res)
 );
 
 /**
@@ -70,7 +70,7 @@ router.get(
   "/onboarding-status",
   authMiddleware,
   (req, res, next) =>
-    businessController.getOnboardingStatus(req, res, next)
+    businessController.getOnboardingStatus(req, res)
 );
 
 export default router;
