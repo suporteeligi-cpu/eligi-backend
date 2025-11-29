@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
 
 export class AuthController {
-
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password, name } = req.body;
@@ -63,7 +62,6 @@ export class AuthController {
     }
   }
 
-  // 🔥 Google Auth
   async googleAuth(req: Request, res: Response, next: NextFunction) {
     try {
       const { credential } = req.body;
