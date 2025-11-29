@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService';
 
 export class AuthController {
+
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, password, name } = req.body;
@@ -62,31 +63,6 @@ export class AuthController {
     }
   }
 
-  async googleAuth(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { credential } = req.body;
-
-      if (!credential) {
-        return res.status(400).json({ message: "Google credential is required" });
-      }
-
-      const result = await authService.googleAuth(credential);
-
-      return res.status(200).json({
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-          avatar: result.user.avatar
-        },
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken
-      });
-
-    } catch (err) {
-      next(err);
-    }
-  }
 }
 
 export const authController = new AuthController();
