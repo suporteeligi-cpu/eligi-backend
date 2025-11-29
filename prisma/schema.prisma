@@ -1,0 +1,153 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  passwordHash String?
+  name         String
+  googleId     String? @unique
+  avatar       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businesses    Business[]
+  refreshTokens RefreshToken[]
+  BusinessTeam  BusinessTeam[]
+  Appointment   Appointment[]  @relation("UserAppointments") // clientes (opcional)
+}
+
+model Business {
+  id             String  @id @default(uuid())
+  name           String
+  phone          String?
+  street         String?
+  number         String?
+  complement     String?
+  segment        String?
+  neighborhood   String?
+  city           String?
+  latitude       Float?
+  longitude      Float?
+  onboardingStep Int     @default(1)
+
+  ownerId String @unique
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  BusinessHours BusinessHours[]
+  BusinessTeam  BusinessTeam[]
+  TeamInvite    TeamInvite[]
+  Service       Service[]
+  Appointment   Appointment[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model BusinessHours {
+  id         String   @id @default(uuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id])
+  dayOfWeek  Int
+  openTime   String?
+  closeTime  String?
+  isClosed   Boolean  @default(false)
+}
+
+model BusinessTeam {
+  id         String  @id @default(uuid())
+  businessId String
+  userId     String?
+  name       String
+  role       String?
+  email      String
+  avatar     String?
+  isOwner    Boolean @default(false)
+
+  canAccessAgenda    Boolean @default(true)
+  canManageServices  Boolean @default(false)
+  canViewFinancial   Boolean @default(false)
+  canIssueNFe        Boolean @default(false)
+  canManageTeam      Boolean @default(false)
+  canAccessDashboard Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  appointments Appointment[] @relation("ProfessionalAppointments")
+}
+
+model TeamInvite {
+  id          String  @id @default(uuid())
+  businessId  String
+  email       String
+  name        String
+  role        String?
+  inviteToken String  @unique
+  used        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  business Business @relation(fields: [businessId], references: [id])
+}
+
+//////////////////////////////////////////////////////////////
+// 🔥 NOVO — Tabela de Serviços (necessária para faturamento)
+//////////////////////////////////////////////////////////////
+model Service {
+  id          String  @id @default(uuid())
+  businessId  String
+  name        String
+  duration    Int // em minutos
+  price       Float
+  description String?
+  active      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  appointments Appointment[]
+}
+
+//////////////////////////////////////////////////////////////
+// 🔥 NOVO — Tabela de Agendamentos (Appointments)
+//////////////////////////////////////////////////////////////
+model Appointment {
+  id             String   @id @default(uuid())
+  businessId     String
+  clientId       String? // usuário cliente (futuro app do cliente)
+  professionalId String? // BusinessTeam.id
+  serviceId      String
+  date           DateTime
+  status         String // pending, confirmed, completed, canceled
+  price          Float    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business     Business      @relation(fields: [businessId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  professional BusinessTeam? @relation("ProfessionalAppointments", fields: [professionalId], references: [id])
+  client       User?         @relation("UserAppointments", fields: [clientId], references: [id])
+}

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const businessController_1 = require("../controllers/businessController");
+const authMiddleware_1 = require("../middlewares/authMiddleware");
+const validateRequest_1 = require("../middlewares/validateRequest");
+const business_dto_1 = require("../dtos/business.dto");
+const router = (0, express_1.Router)();
+router.post('/basic-info', authMiddleware_1.authMiddleware, (0, validateRequest_1.validateRequest)(business_dto_1.basicInfoSchema), (req, res, next) => businessController_1.businessController.basicInfo(req, res, next));
+router.post('/location', authMiddleware_1.authMiddleware, (0, validateRequest_1.validateRequest)(business_dto_1.locationSchema), (req, res, next) => businessController_1.businessController.location(req, res, next));
+router.post('/finish-step-1', authMiddleware_1.authMiddleware, (0, validateRequest_1.validateRequest)(business_dto_1.finishStepSchema), (req, res, next) => businessController_1.businessController.finishStep1(req, res, next));
+exports.default = router;

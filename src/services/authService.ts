@@ -1,0 +1,140 @@
+import { userRepository } from '../repositories/userRepository';
+import { refreshTokenRepository } from '../repositories/refreshTokenRepository';
+import { comparePassword, hashPassword } from '../utils/hash';
+import { signAccessToken, signRefreshToken } from '../utils/jwt';
+import { OAuth2Client } from 'google-auth-library';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export class AuthService {
+  async register(data: { email: string; password: string; name: string }) {
+    const existing = await userRepository.findByEmail(data.email);
+    if (existing) {
+      const error = new Error('Email already in use');
+      (error as any).status = 409;
+      throw error;
+    }
+
+    const passwordHash = await hashPassword(data.password);
+    const user = await userRepository.create({
+      email: data.email,
+      passwordHash,
+      name: data.name
+    });
+
+    const accessToken = signAccessToken({ sub: user.id, email: user.email });
+    const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+    await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
+
+    return { user, accessToken, refreshToken };
+  }
+
+  async login(data: { email: string; password: string }) {
+    const user = await userRepository.findByEmail(data.email);
+    if (!user) {
+      const error = new Error('Invalid credentials');
+      (error as any).status = 401;
+      throw error;
+    }
+
+    const match = await comparePassword(data.password, user.passwordHash);
+    if (!match) {
+      const error = new Error('Invalid credentials');
+      (error as any).status = 401;
+      throw error;
+    }
+
+    const accessToken = signAccessToken({ sub: user.id, email: user.email });
+    const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+    await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
+
+    return { user, accessToken, refreshToken };
+  }
+
+  async refreshToken(token: string) {
+    const existing = await refreshTokenRepository.findValid(token);
+    if (!existing) {
+      const error = new Error('Invalid refresh token');
+      (error as any).status = 401;
+      throw error;
+    }
+
+    const user = await userRepository.findById(existing.userId);
+    if (!user) {
+      const error = new Error('User not found');
+      (error as any).status = 404;
+      throw error;
+    }
+
+    const accessToken = signAccessToken({ sub: user.id, email: user.email });
+    const newRefreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+    await refreshTokenRepository.revoke(token);
+    await refreshTokenRepository.create({ userId: user.id, token: newRefreshToken });
+
+    return { accessToken, refreshToken: newRefreshToken };
+  }
+
+  async logout(token: string) {
+    await refreshTokenRepository.revoke(token);
+  }
+
+  async logoutAll(userId: string) {
+    await refreshTokenRepository.revokeAllForUser(userId);
+  }
+
+  // ✅🔥 NOVO — Login/Register via Google (SEM ALTERAR NADA DO RESTO)
+  async googleAuth(credential: string) {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      const err = new Error("Invalid Google token");
+      (err as any).status = 400;
+      throw err;
+    }
+
+    const email = payload.email!;
+    const name = payload.name!;
+    const avatar = payload.picture;
+    const googleId = payload.sub;
+
+    let user = await userRepository.findByEmail(email);
+
+    // Já existe → login normal
+    if (user) {
+      const accessToken = signAccessToken({ sub: user.id, email: user.email });
+      const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+      await refreshTokenRepository.create({
+        userId: user.id,
+        token: refreshToken
+      });
+
+      return { user, accessToken, refreshToken };
+    }
+
+    // Criar novo usuário Google
+    user = await userRepository.create({
+      email,
+      name,
+      googleId,
+      avatar,
+      passwordHash: null
+    });
+
+    const accessToken = signAccessToken({ sub: user.id, email: user.email });
+    const refreshToken = signRefreshToken({ sub: user.id, email: user.email });
+
+    await refreshTokenRepository.create({ userId: user.id, token: refreshToken });
+
+    return { user, accessToken, refreshToken };
+  }
+}
+
+export const authService = new AuthService();
